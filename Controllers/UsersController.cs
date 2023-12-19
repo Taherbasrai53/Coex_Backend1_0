@@ -57,7 +57,7 @@ namespace COeX_India1._0.Controllers
         }
 
         [AllowAnonymous]
-        [HttpPost]
+        [HttpPost("loginCluster")]
         public async Task<ActionResult> loginCluster(ClusterLoginModel loginModel)
         {
             try
@@ -70,7 +70,7 @@ namespace COeX_India1._0.Controllers
                 var cluster= await _dbContext.Clusters.AsNoTracking().Where(c=> c.Id == loginModel.ClusterId && c.Passcode == loginModel.passcode).FirstOrDefaultAsync();
                 if(cluster == null) { return BadRequest(new Response(false, "cluster or passcode invalid")); }
 
-                var user=await _dbContext.Users.AsNoTracking().Where(c => c.Username == loginModel.Username && c.Password == loginModel.Password && c.UserType == 0).FirstOrDefaultAsync();
+                var user=await _dbContext.Users.AsNoTracking().Where(c => c.Username == loginModel.Username && c.Password == loginModel.Password && c.UserType == Models.User.EUserType.ClusterManager).FirstOrDefaultAsync();
                 if(user == null)
                 {
                     return BadRequest(new Response(false, "Username or password invalid"));
@@ -83,6 +83,39 @@ namespace COeX_India1._0.Controllers
 
             }
             catch(Exception ex)
+            {
+                return Problem("Oops! plz try again later");
+            }
+        }
+
+        [HttpPost("loginMine")]
+        [AllowAnonymous]
+
+        public async Task<ActionResult> loginMine(MineLoginModel loginModel)
+        {
+            try
+            {
+                if (loginModel == null) { return BadRequest(new Response(false, "Plz enter credentials")); }
+                if (loginModel.MineId == 0) { return BadRequest(new Response(false, "Plz enter a valid Cluster Id")); }
+                if (string.IsNullOrWhiteSpace(loginModel.Username)) { return BadRequest(new Response(false, "Plz enter a valid username")); }
+                if (string.IsNullOrWhiteSpace(loginModel.Password)) { return BadRequest(new Response(false, "Plz enter a valid Password")); }
+
+                var mine = await _dbContext.Mines.AsNoTracking().Where(c => c.Id == loginModel.MineId && c.Passcode == loginModel.passcode).FirstOrDefaultAsync();
+                if (mine == null) { return BadRequest(new Response(false, "mine or passcode invalid")); }
+
+                var user = await _dbContext.Users.AsNoTracking().Where(c => c.Username == loginModel.Username && c.Password == loginModel.Password && c.UserType == Models.User.EUserType.MineManager).FirstOrDefaultAsync();
+                if (user == null)
+                {
+                    return BadRequest(new Response(false, "Username or password invalid"));
+                }
+
+                var token = GenerateToken(user);
+                if (token == string.Empty) { return BadRequest(new Response(false, "Please Try Again In a While")); }
+
+                return Ok(new LoginResponse(true, token));
+
+            }
+            catch (Exception ex)
             {
                 return Problem("Oops! plz try again later");
             }

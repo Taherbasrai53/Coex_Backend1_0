@@ -58,11 +58,12 @@ Delete from requests where status=0
 --declare @ClusterId int=2
 declare @CurrRakes int
 declare @LiveReq int
+declare @i int=0;
 
 declare @RakeShortage int
 select @RakeShortage= LiveRequests-AvailableRakes from Clusters where Id=@ClusterId
 
-select Top(@RakeShortage) M.Id as MineId, M.ClusterId, M.Lat, M.Long, (M.TriggerYield-M.CurrYield)/M.YieldPerDay as RemainingDays, 0 as Completed, Cluster.*
+select M.Id as MineId, M.ClusterId, M.Lat, M.Long, (M.TriggerYield-M.CurrYield)/M.YieldPerDay as RemainingDays, 0 as Completed, Cluster.*
 into #tmpCDAct
 	from Mines M
 	outer apply(
@@ -73,8 +74,9 @@ into #tmpCDAct
 	order by CostFunc desc
 	) as Cluster
 	where M.ClusterId=@ClusterId and M.AllocationStatus=0 and (M.TriggerYield-M.CurrYield)/M.YieldPerDay<= 2
-	order by Cluster.CostFunc desc
-
+	
+	--select * from #tmpCDAct order by CostFunc desc
+	  
 	DECLARE @MineIdTmp INT, @ClusterIdTmp INT, @MineLat FLOAT, @MineLong FLOAT ,@RemainingDays FLOAT, @RequesteeClusterId INT, @Completed INT, @CostFunc FLOAT;
 
 	DECLARE cursorName CURSOR FOR
@@ -87,7 +89,8 @@ into #tmpCDAct
 	
 	while @@FETCH_STATUS =0
 	Begin
-
+	if @i<@RakeShortage
+	begin
 	select @CurrRakes=TentativelyAvailable, @LiveReq=LiveRequests from Clusters where Id=@RequesteeClusterId
 
 	if @CurrRakes=@LiveReq
@@ -111,11 +114,18 @@ into #tmpCDAct
 	
 	Update Clusters set TentativelyAvailable= @CurrRakes-1 where Id=@RequesteeClusterId
 	end
+	end
+	else 
+	begin
+	Insert into Requests (SenderId, RecieverId, Priority, Status, InsertDate) values(@MineIdTmp, @ClusterIdTmp, 2, 0, GETDATE())
+	end
 
+	set @i=@i+1
 	FETCH NEXT FROM cursorName INTO @MineIdTmp, @ClusterIdTmp, @MineLat, @MineLong, @RemainingDays, @RequesteeClusterId, @Completed, @CostFunc;
 
 	End
-
+	CLOSE cursorName;
+    DEALLOCATE cursorName;
 	--Select LiveRequests-AvailableRakes as OverflowVal from Clusters where Id=@ClusterId
 
 	Drop table #tmpCDAct;
